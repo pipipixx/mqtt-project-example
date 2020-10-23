@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="zh">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    .container {
+      display: flex;
+      justify-content: space-between;
+      flex-wrap: wrap;
+    }
+    .container .device {
+      padding: 5px;
+      width: 200px;
+      height: 200px;
+      background-color: rgb(211, 211, 211);
+      margin-bottom: 10px;
+    }
+  </style>
+  <title>mqtt</title>
+  <script src="/js/mqtt.min.js"></script>
+  <script src="/js/vue.min.js"></script>
+  <script src="/js/axios.min.js"></script>
+</head>
+
+<body>
+  <h2>mqtt</h2>
+
+  <div id="app">
+    <div>
+      <input v-model="clientId" type="text">
+      <button @click="regClient">注册设备</button>
+    </div><br>
+    
+    <div class="container">
+
+      <div class="device" v-for="(val,key,index) in clients" :key="index">
+        <div>clientId: {{ key }}</div>
+        <div>状态: {{ val.state===true?'在线':'离线' }}</div>
+        <div>当前值: {{ val.val }}</div>
+        <div><button @click="downParm(key)">下发参数</button></div>
+      </div>
+
+    </div>
+  </div>
+
+
+  <script>
+
+    //ws连接mqtt
+    const client = mqtt.connect('ws://127.0.0.1:1884', { username: 'mimi', password: '123456' })
+    client.on('connect', function () {
+      console.log('已连接')
+    })
+    client.subscribe("upData")
+    client.subscribe("onlineList")
+    // client.publish("presence", "hello world!")
+    // client.end()   //结束客户端
+    
+
+    var vm = new Vue({
+      el: '#app',
+      data() {
+        return {
+          clientId: '',
+          clients: {}
+        }
+      },
+      created() {
+        this.allClients()
+        this.mqttOnMsg()
+      },
+      mounted() {
+        
+      },
+      methods: {
+        mqttOnMsg() {
+          client.on("message", (topic, payload)=> {
+            // console.log(`${topic}: ${payload}`)
+            // 修改设备状态
+            if (topic === 'onlineList') {
+              let onlineArr = JSON.parse(payload)
+              let allArr = Object.keys(this.clients)
+              let chaji = allArr.filter(function(v){ return onlineArr.indexOf(v) == -1 })
+              // console.log(chaji)
+              chaji.forEach(v=> {
+                this.$set(this.clients[v], 'state', false)
+                this.$set(this.clients[v], 'val', '')
+              })
+              onlineArr.forEach(v=> {
+                this.$set(this.clients[v], 'state', true)
+              })
+
+            }
+            if (topic === 'upData') {
+              let param = JSON.parse(payload)
+              this.$set(this.clients[param.id],'val',param.val)
+            }
+
+          })
+        },
+        allClients() {
+          axios.get('/allClients').then((res)=> {
+            if (res.data.length) {
+              res.data.forEach(v=> {
+                this.$set(this.clients, v, {})
+                this.$set(this.clients[v], 'state', false)
+                this.$set(this.clients[v], 'val', '')
+              })
+            }
+          })
+        },
+        regClient() {
+          axios.post('/addDevice',{id: this.clientId}).then((res)=> {
+            if (res.data.state === true) {
+              this.$set(this.clients, this.clientId, {})
+              this.$set(this.clients[this.clientId], 'state', false)
+              this.$set(this.clients[this.clientId], 'val', '')
+            }else {
+              alert('设备冲突')
+            }
+          })
+        },
+        downParm(key) {
+          // console.log(key)
+          client.publish(`downParam/${key}`, 'active')
+        }
+        
+      }
+    })
+  </script>
+</body>
+
+</html>
