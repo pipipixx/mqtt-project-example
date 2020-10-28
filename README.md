@@ -1,5 +1,7 @@
 # mqtt-project-example
-use mqtt.js,aedes,express. iot project example. 
+use mqtt.js,aedes,express. 
+iot project example.
+代码在master分支
 
 ## 使用到的框架和模块
 服务端使用express框架,前端页面使用vue.js
